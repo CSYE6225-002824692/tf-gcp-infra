@@ -10,8 +10,26 @@ jobs:
   basic_job:
     runs-on: ubuntu-latest
     steps:
-          - name: Checkout code
-            uses: actions/checkout@v2
-          
-          - name: Echo a message
-            run: echo "CI workflow triggered successfully!"
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Echo a message
+        run: echo "CI workflow triggered successfully!"
+
+  terraform_validation:
+    needs: basic_job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: '1.7.3' # Ensure this matches the version you're using
+
+      - name: Terraform Initialization
+        run: terraform init
+
+      - name: Terraform Validation
+        run: terraform validate
