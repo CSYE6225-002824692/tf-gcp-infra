@@ -5,3 +5,8 @@ variable "region" {
   type        = string
   default     = "us-east1"
 }
+
+variable "vpc_name" {
+  description = "The name of the VPC to be created"
+  type        = string
+}
