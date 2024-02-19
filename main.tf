@@ -31,6 +31,6 @@ resource "google_compute_subnetwork" "db_subnet" {
 resource "google_compute_route" "webapp_internet_route" {
   name             = "${var.vpc_name}-internet-route"
   dest_range       = "0.0.0.0/0"
-  network          = google_compute_network.vpc.id
+  network          = google_compute_networks.vpc.id
   next_hop_gateway = "default-internet-gateway"
 }
