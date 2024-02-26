@@ -78,6 +78,10 @@ resource "google_sql_database_instance" "mysql" {
     deletion_protection_enabled = var.deletion_protection_enabled
 
   }
+  
+  depends_on = [
+    google_service_networking_connection.private_vpc_connection
+  ]
 }
 
 resource "google_sql_database" "webapp_database" {

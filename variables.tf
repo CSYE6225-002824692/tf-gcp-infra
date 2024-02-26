@@ -177,7 +177,7 @@ variable "backup_configuration_enabled" {
 variable "disk_autoresize_db" {
   description = "Whether the disk for the Cloud SQL instance is automatically resized."
   type        = bool
-  default     = true
+  default     = false
   
 }
 
