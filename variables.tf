@@ -239,3 +239,58 @@ variable "dest_range_webapp_internet_route" {
   default     = "0.0.0.0/0"
   
 }
+
+variable "vm_service_account" {
+  description = "The service account to use for the VM."
+  type        = string
+  default     = "vm-service-account"
+}
+
+variable "vm_service_account_display_name" {
+  description = "The display name for the VM service account."
+  type        = string
+  default     = "VM Service Account"
+  
+}
+
+variable "logging_admin_role" {
+  description = "The role to grant to the logging service account."
+  type        = string
+  default     = "roles/logging.admin"
+  
+}
+
+variable "monitoring_metric_writer_role" {
+  description = "The role to grant to the monitoring service account."
+  type        = string
+  default     = "roles/monitoring.metricWriter"
+  
+}
+
+variable "existing_dns_managed_zone" {
+  description = "The name of the existing DNS managed zone."
+  type        = string
+  default     = "csye-webapp-zone"
+  
+}
+
+variable "vm_a_record_name" {
+  description = "The name of the A record for the VM."
+  type        = string
+  default     = "csyewebapp.me."
+  
+}
+
+variable "vm_a_record_type" {
+  description = "The type of the A record for the VM."
+  type        = string
+  default     = "A"
+  
+}
+
+variable "vm_a_record_ttl" {
+  description = "The TTL of the A record for the VM."
+  type        = number
+  default     = 300
+  
+}
