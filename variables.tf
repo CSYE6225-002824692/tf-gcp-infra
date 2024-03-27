@@ -294,3 +294,209 @@ variable "vm_a_record_ttl" {
   default     = 300
   
 }
+
+variable "pubsub_topic_name" {
+  description = "The name of the Pub/Sub topic."
+  type        = string
+  default     = "verify_email"
+  
+}
+
+variable "pubsub_publisher_binding_role" {
+  description = "The role to grant to the Pub/Sub publisher."
+  type        = string
+  default     = "roles/pubsub.publisher"
+  
+}
+
+variable "message_retention_duration_pubsub" {
+  description = "The duration to retain messages in the Pub/Sub topic."
+  type        = string
+  default     = "604800s"
+  
+}
+
+variable "cloud_function_service_account" {
+  description = "The service account to use for the Cloud Function."
+  type        = string
+  default     = "cloud-function-service-account"
+  
+}
+
+variable "cloud_function_service_account_display_name" {
+  description = "The display name for the Cloud Function service account."
+  type        = string
+  default     = "Cloud Function Service Account"
+  
+}
+
+variable "service_account_storage_viewer_role" {
+  description = "The role to grant to the storage viewer service account."
+  type        = string
+  default     = "roles/storage.objectViewer"
+  
+}
+
+variable "cloud_function_vpc_connector_name" {
+  description = "The name of the VPC connector for the Cloud Function."
+  type        = string
+  default     = "cf-verify-email-connector"
+  
+}
+
+variable "cloud_function_vpc_connector_cidr" {
+  description = "The CIDR block for the VPC connector for the Cloud Function."
+  type        = string
+  default     = "10.8.0.0/28" 
+  
+}
+
+variable "service_account_sql_client_role" {
+  description = "The role to grant to the Cloud Function service account."
+  type        = string
+  default     = "roles/cloudsql.client"
+  
+}
+
+variable "service_account_run_invoker_role" {
+  description = "The role to grant to the Cloud Function service account."
+  type        = string
+  default     = "roles/run.invoker"
+  
+}
+
+variable "verify_email_function_name" {
+  description = "The name of the Cloud Function."
+  type        = string
+  default     = "EmailVerificationFunction"
+  
+}
+
+variable "verify_email_function_runtime" {
+  description = "The runtime for the Cloud Function."
+  type        = string
+  default     = "java17"
+  
+}
+
+variable "verify_email_function_entry_point" {
+  description = "The entry point for the Cloud Function."
+  type        = string
+  default     = "gcfv2pubsub.EmailVerificationFunction"
+  
+}
+
+variable "verify_email_function_description" {
+  description = "The description for the Cloud Function."
+  type        = string
+  default     = "Function to process email verification"
+  
+}
+
+variable "cloud_function_memory" {
+  description = "The memory allocated to the Cloud Function."
+  type        = string
+  default     = "256Mi"
+  
+}
+
+variable "storage_source_bucket" {
+  description = "The name of the source bucket."
+  type        = string
+  default     = "webapp-verify-email-dev-bucket"
+  
+}
+
+variable "storage_source_object" {
+  description = "The role to grant to the source bucket."
+  type        = string
+  default     = "verify-email-function-source.zip"
+  
+}
+
+variable "max_instance_count" {
+  description = "The maximum number of instances for the Cloud Function."
+  type        = number
+  default     = 3
+  
+}
+
+variable "min_instance_count" {
+  description = "The minimum number of instances for the Cloud Function."
+  type        = number
+  default     = 1
+  
+}
+
+variable "timeout_seconds" {
+  description = "The timeout for the Cloud Function."
+  type        = number
+  default     = 60
+  
+}
+
+variable "ingress_settings" {
+  description = "The ingress settings for the Cloud Function."
+  type        = string
+  default     = "ALLOW_INTERNAL_ONLY"
+  
+}
+
+variable "all_traffic_on_latest_revision" {
+  description = "Whether all traffic is sent to the latest revision."
+  type        = bool
+  default     = true
+  
+}
+
+variable "event_type" {
+  description = "The event type for the Cloud Function."
+  type        = string
+  default     = "google.cloud.pubsub.topic.v1.messagePublished"
+  
+}
+
+variable "retry_policy" {
+  description = "The retry policy for the Cloud Function."
+  type        = string
+  default     = "RETRY_POLICY_DO_NOT_RETRY"
+  
+}
+
+variable "verify_email_subscription_name" {
+  description = "The name of the Pub/Sub subscription for verifying emails."
+  type        = string
+  default     = "verify-email-subscription"
+}
+
+variable "ack_deadline_seconds" {
+  description = "The maximum time after a subscriber receives a message before the subscriber should acknowledge the message."
+  type        = number
+  default     = 20
+}
+
+variable "message_retention_duration_subscription" {
+  description = "How long Pub/Sub retains the messages in a subscription."
+  type        = string
+  default     = "604800s" 
+}
+
+variable "retain_acked_messages" {
+  description = "Whether to retain acknowledged messages."
+  type        = bool
+  default     = false
+}
+
+variable "subscription_expiration_ttl" {
+  description = "The TTL of the subscription."
+  type        = string
+  default     = "604800s"
+}
+
+
+variable "cf_service_account_subscriber_role" {
+  description = "The role to grant to the Cloud Function service account."
+  type        = string
+  default     = "roles/pubsub.subscriber"
+  
+}
