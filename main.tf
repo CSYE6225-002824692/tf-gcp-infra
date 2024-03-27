@@ -167,6 +167,19 @@ resource "google_project_iam_binding" "monitoring_metric_writer_binding" {
   ]
 }
 
+resource "google_project_iam_binding" "pubsub_publisher_binding" {
+  project = var.project
+  role    = var.pubsub_publisher_binding_role
+
+  members = [
+    "serviceAccount:${google_service_account.vm_service_account.email}",
+  ]
+
+  depends_on = [
+    google_service_account.vm_service_account
+  ]
+}
+
 # Define a VM instance with specific machine type, boot disk, network interface, and service account settings
 resource "google_compute_instance" "vm_instance" {
   name         = var.instance_name
@@ -224,4 +237,141 @@ resource "google_dns_record_set" "vm_a_record" {
   depends_on = [
     google_compute_instance.vm_instance
   ]
+}
+# Create the Pub/Sub topic named 'verify_email'
+resource "google_pubsub_topic" "verify_email_topic" {
+  name = var.pubsub_topic_name
+  message_retention_duration = var.message_retention_duration_pubsub
+}
+
+resource "google_pubsub_subscription" "verify_email_subscription" {
+  name  = var.verify_email_subscription_name
+  topic = google_pubsub_topic.verify_email_topic.name
+
+  ack_deadline_seconds = var.ack_deadline_seconds
+
+  message_retention_duration = var.message_retention_duration_subscription
+  retain_acked_messages      = var.retain_acked_messages
+
+  expiration_policy {
+    ttl = var.subscription_expiration_ttl
+  }
+}
+
+
+# Create a service account for the Cloud Function
+resource "google_service_account" "cloud_function_service_account" {
+  account_id   = var.cloud_function_service_account
+  display_name = var.cloud_function_service_account_display_name
+}
+
+resource "google_project_iam_binding" "service_account_storage_viewer" {
+  project = var.project
+  role    = var.service_account_storage_viewer_role
+
+  members = [
+    "serviceAccount:${google_service_account.cloud_function_service_account.email}",
+  ]
+
+  depends_on = [
+      google_service_account.cloud_function_service_account
+  ]
+}
+
+resource "google_project_iam_binding" "cf_service_account_subscriber_role" {
+  project = var.project
+  role    = var.cf_service_account_subscriber_role
+
+  members = [
+    "serviceAccount:${google_service_account.cloud_function_service_account.email}",
+    ]
+
+  depends_on = [
+      google_service_account.cloud_function_service_account
+  ]
+}
+
+
+resource "google_vpc_access_connector" "cloud_function_vpc_connector" {
+  name          = var.cloud_function_vpc_connector_name
+  project       = var.project
+  region        = var.region
+  network       = google_compute_network.vpc.id
+  ip_cidr_range = var.cloud_function_vpc_connector_cidr
+}
+
+# Assign the monitoring metric writer role to the VM service account at the project level
+resource "google_project_iam_binding" "service_account_sql_client" {
+  project = var.project
+  role    = var.service_account_sql_client_role
+
+  members = [
+    "serviceAccount:${google_service_account.cloud_function_service_account.email}",
+  ]
+
+  depends_on = [
+      google_service_account.cloud_function_service_account
+  ]
+}
+
+resource "google_project_iam_binding" "service_account_run_invoker" {
+  project = var.project
+  role    = var.service_account_run_invoker_role
+
+  members = [
+    "serviceAccount:${google_service_account.cloud_function_service_account.email}",
+  ]
+
+  depends_on = [
+      google_service_account.cloud_function_service_account
+  ]
+}
+
+# Create a Cloud Function triggered by the 'verify_email' topic
+resource "google_cloudfunctions2_function" "verify_email_function" {
+  name                  = var.verify_email_function_name
+  description           = var.verify_email_function_description
+  location              = var.region
+
+  build_config {
+    runtime               = var.verify_email_function_runtime
+    entry_point           = var.verify_email_function_entry_point
+
+    source {
+      storage_source {
+        bucket = var.storage_source_bucket
+        object = var.storage_source_object
+      }
+    }
+  }
+
+  service_config {
+    available_memory   = var.cloud_function_memory
+    max_instance_count = var.max_instance_count
+    min_instance_count = var.min_instance_count
+    timeout_seconds    = var.timeout_seconds
+
+    environment_variables = {
+      DB_NAME = google_sql_database.webapp_database.name
+      DB_USERNAME = google_sql_user.webapp_user.name
+      DB_PASSWORD = google_sql_user.webapp_user.password
+      INSTANCE_CONNECTION_NAME = google_sql_database_instance.mysql.connection_name
+    }
+
+    ingress_settings               = var.ingress_settings
+    all_traffic_on_latest_revision = var.all_traffic_on_latest_revision
+    service_account_email          = google_service_account.cloud_function_service_account.email
+    vpc_connector = google_vpc_access_connector.cloud_function_vpc_connector.name
+  }
+  
+
+  event_trigger {
+    trigger_region = var.region
+    event_type     = var.event_type
+    pubsub_topic   = google_pubsub_topic.verify_email_topic.id
+    retry_policy   = var.retry_policy
+    service_account_email = google_service_account.cloud_function_service_account.email
+  }
+
+  depends_on = [ google_vpc_access_connector.cloud_function_vpc_connector ]
 }
