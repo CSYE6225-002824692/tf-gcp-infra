@@ -34,3 +34,13 @@ override.tf.json
 terraform.rc
 
 .terraform.lock.hcl
+
+# Ignore Visual Studio Code files
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Ignore macOS directory attributes
+.DS_Store
