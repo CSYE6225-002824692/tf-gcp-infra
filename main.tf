@@ -106,19 +106,6 @@ resource "google_sql_user" "webapp_user" {
   password = random_password.webapp_password.result
 }
 
-# Create a firewall rule to allow web traffic to the VPC, specifying allowed protocols and ports
-resource "google_compute_firewall" "allow_web_traffic" {
-  name    = "${var.vpc_name}-allow-web"
-  network = google_compute_network.vpc.id
-
-  allow {
-    protocol = var.protocol
-    ports    = var.webapp_port
-  }
-
-  source_ranges = [var.firewall_allow_source_ranges]
-}
-
 # Create a firewall rule to deny SSH traffic to the VPC, specifying denied protocols and ports
 resource "google_compute_firewall" "deny_ssh" {
   name    = "${var.vpc_name}-deny-ssh"
@@ -180,21 +167,16 @@ resource "google_project_iam_binding" "pubsub_publisher_binding" {
   ]
 }
 
-# Define a VM instance with specific machine type, boot disk, network interface, and service account settings
-resource "google_compute_instance" "vm_instance" {
-  name         = var.instance_name
+
+resource "google_compute_region_instance_template" "webapp_template" {
+  name         = "${var.instance_name}-template"
   machine_type = var.machine_type
-  zone         = var.zone
-
-  tags = var.tags
-  boot_disk {
-    initialize_params {
-      image = var.boot_disk_image
-      type  = var.boot_disk_type
-      size  = var.boot_disk_size
-    }
+  region       = var.region
+  disk {
+    source_image = var.boot_disk_image
+    auto_delete  = true
+    boot         = true
   }
-
   network_interface {
     network    = google_compute_network.vpc.id
     subnetwork = google_compute_subnetwork.webapp_subnet.id
@@ -216,28 +198,61 @@ resource "google_compute_instance" "vm_instance" {
   }
 
   metadata_startup_script = file(var.startup_script_path)
+}
+
+resource "google_compute_region_instance_group_manager" "webapp_instance_group_manager" {
+  name = "${var.instance_name}-instance-group-manager"
+  region = var.region
+  base_instance_name = var.instance_name
+  target_size = 1
+  version {
+    instance_template = google_compute_region_instance_template.webapp_template.self_link
+  }
+  named_port {
+    name = var.named_port_name
+    port = var.named_port_port
+  }
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.webapp_health_check.id
+    initial_delay_sec = var.initial_delay_sec  
+  }
 
   depends_on = [
-      google_service_account.vm_service_account
+    google_compute_region_instance_template.webapp_template
   ]
 }
 
+resource "google_compute_health_check" "webapp_health_check" {
+  name               = "${var.instance_name}-health-check"
+  check_interval_sec = var.check_interval_sec
+  timeout_sec        = var.timeout_sec
+  healthy_threshold  = var.healthy_threshold
+  unhealthy_threshold = var.unhealthy_threshold
+  http_health_check {
+    port    = var.named_port_port
+    request_path = var.health_check_request_path
+  }
+}
+
+resource "google_compute_region_autoscaler" "webapp_autoscaler" {
+  name   = "${var.instance_name}-autoscaler"
+  target = google_compute_region_instance_group_manager.webapp_instance_group_manager.id
+  region = var.region
+
+  autoscaling_policy {
+    max_replicas    = var.auto_scaling_max_instances
+    min_replicas    = var.auto_scaling_min_instances
+    cooldown_period = var.cooldown_period
+    cpu_utilization {
+      target = var.cpu_utilization_target
+    }
+  }
+}
 data "google_dns_managed_zone" "existing_zone" {
   name = var.existing_dns_managed_zone
 }
 
-# Define a DNS A record for the VM instance within an existing managed DNS zone
-resource "google_dns_record_set" "vm_a_record" {
-  name         = var.vm_a_record_name
-  type         = var.vm_a_record_type
-  ttl          = var.vm_a_record_ttl
-  managed_zone = data.google_dns_managed_zone.existing_zone.name
-  rrdatas      = [google_compute_instance.vm_instance.network_interface[0].access_config[0].nat_ip]
-
-  depends_on = [
-    google_compute_instance.vm_instance
-  ]
-}
 # Create the Pub/Sub topic named 'verify_email'
 resource "google_pubsub_topic" "verify_email_topic" {
   name = var.pubsub_topic_name
@@ -374,4 +389,67 @@ resource "google_cloudfunctions2_function" "verify_email_function" {
   }
 
   depends_on = [ google_vpc_access_connector.cloud_function_vpc_connector ]
+}
+
+resource "google_compute_managed_ssl_certificate" "webapp_lb_ssl_cert" {
+  name = var.webapp_lb_ssl_certificate
+  managed {
+    domains = var.domains
+  }
+}
+
+resource "google_compute_backend_service" "webapp_lb_backend_service" {
+  name        = var.webapp_lb_backend_service_name
+  protocol    = var.webapp_lb_backend_service_protocol
+  port_name   = var.named_port_name
+  timeout_sec = var.webapp_lb_backend_service_timeout
+  health_checks = [google_compute_health_check.webapp_health_check.id]
+  backend {
+    group = google_compute_region_instance_group_manager.webapp_instance_group_manager.instance_group
+  }
+  depends_on = [google_compute_region_instance_group_manager.webapp_instance_group_manager]
+}
+
+resource "google_compute_url_map" "webapp_lb_url_map" {
+  name            = var.webapp_lb_url_map_name
+  default_service = google_compute_backend_service.webapp_lb_backend_service.id
+  depends_on      = [google_compute_backend_service.webapp_lb_backend_service]
+}
+
+resource "google_compute_target_https_proxy" "webapp_lb_https_proxy" {
+  name             = var.webapp_lb_https_proxy_name
+  url_map          = google_compute_url_map.webapp_lb_url_map.id
+  ssl_certificates = [google_compute_managed_ssl_certificate.webapp_lb_ssl_cert.id]
+  depends_on       = [google_compute_managed_ssl_certificate.webapp_lb_ssl_cert]
+}
+
+resource "google_compute_global_forwarding_rule" "webapp_lb_forwarding_rule" {
+  name       = var.webapp_lb_forwarding_rule_name
+  target     = google_compute_target_https_proxy.webapp_lb_https_proxy.id
+  port_range = var.webapp_lb_forwarding_rule_port
+}
+
+data "google_compute_global_forwarding_rule" "webapp_lb_forwarding_rule" {
+  name = var.webapp_lb_forwarding_rule_name
+  depends_on = [google_compute_global_forwarding_rule.webapp_lb_forwarding_rule]
+}
+
+resource "google_dns_record_set" "vm_a_record" {
+  name         = var.vm_a_record_name
+  type         = var.vm_a_record_type
+  ttl          = var.vm_a_record_ttl
+  managed_zone = data.google_dns_managed_zone.existing_zone.name
+  rrdatas = [data.google_compute_global_forwarding_rule.webapp_lb_forwarding_rule.ip_address]
+
+  depends_on = [google_compute_global_forwarding_rule.webapp_lb_forwarding_rule]
+}
+
+resource "google_compute_firewall" "health_check_allow_firewall" {
+  name    = "${var.vpc_name}-internal"
+  network = google_compute_network.vpc.id
+  allow {
+    protocol = var.health_check_firewall_allow_protocol
+    ports    = var.health_check_allow_firewall_ports
+  }
+  source_ranges = var.health_check_allow_firewall_source_ranges 
 }
