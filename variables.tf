@@ -500,3 +500,171 @@ variable "cf_service_account_subscriber_role" {
   default     = "roles/pubsub.subscriber"
   
 }
+
+variable "named_port_name" {
+  description = "The name of the named port."
+  type        = string
+  default     = "http"
+  
+}
+
+variable "named_port_port" {
+  description = "The port number of the named port."
+  type        = number
+  default     = 8080
+  
+}
+
+variable "health_check_request_path" {
+  description = "The request path for the health check."
+  type        = string
+  default     = "/healthz"
+  
+}
+
+variable "auto_scaling_min_instances" {
+  description = "The minimum number of instances for the auto-scaler."
+  type        = number
+  default     = 1
+  
+}
+
+variable "auto_scaling_max_instances" {
+  description = "The maximum number of instances for the auto-scaler."
+  type        = number
+  default     = 3
+  
+}
+
+variable "cooldown_period" {
+  description = "The cooldown period for the auto-scaler."
+  type        = number
+  default     = 60
+  
+}
+
+variable "cpu_utilization_target" {
+  description = "The target CPU utilization for the auto-scaler."
+  type        = number
+  default     = 0.2
+  
+}
+
+variable "webapp_lb_ssl_certificate" {
+  description = "The name of the SSL certificate for the load balancer."
+  type        = string
+  default     = "webapp-ssl-cert"
+  
+}
+
+variable "domains" {
+  description = "The domains to use for the SSL certificate."
+  type        = list(string)
+  default     = ["csyewebapp.me"]
+  
+}
+
+variable "webapp_lb_backend_service_name" {
+  description = "The name of the backend service for the load balancer."
+  type        = string
+  default     = "webapp-backend-service"
+  
+}
+
+variable "webapp_lb_backend_service_protocol" {
+  description = "The protocol for the backend service."
+  type        = string
+  default     = "HTTP"
+  
+}
+
+variable "webapp_lb_backend_service_timeout" {
+  description = "The timeout for the backend service."
+  type        = number
+  default     = 10
+  
+}
+
+variable "webapp_lb_url_map_name" {
+  description = "The name of the URL map for the load balancer."
+  type        = string
+  default     = "webapp-url-map"
+  
+}
+
+variable "webapp_lb_https_proxy_name" {
+  description = "The name of the HTTPS proxy for the load balancer."
+  type        = string
+  default     = "webapp-https-proxy"
+  
+}
+
+variable "webapp_lb_forwarding_rule_name" {
+  description = "The name of the forwarding rule for the load balancer."
+  type        = string
+  default     = "webapp-forwarding-rule"
+  
+}
+
+variable "webapp_lb_forwarding_rule_port" {
+  description = "The port for the forwarding rule."
+  type        = number
+  default     = 443
+  
+}
+
+variable "health_check_firewall_allow_protocol" {
+  description = "The protocol for the health check."
+  type        = string
+  default     = "tcp"
+  
+}
+
+variable "health_check_allow_firewall_ports" {
+  description = "The ports to allow for the health check."
+  type        = list(number)
+  default     = [8080, 443]
+  
+}
+
+variable "health_check_allow_firewall_source_ranges" {
+  description = "The source ranges to allow for the health check."
+  type        = list(string)
+  default     = ["130.211.0.0/22", "35.191.0.0/16"] 
+  
+}
+
+variable "initial_delay_sec" {
+  description = "The initial delay for the health check."
+  type        = number
+  default     = 180
+  
+}
+
+variable "check_interval_sec" {
+  description = "The interval between health checks."
+  type        = number
+  default     = 30
+  
+}
+
+variable "timeout_sec" {
+  description = "The timeout for the health check."
+  type        = number
+  default     = 10
+  
+}
+
+variable "healthy_threshold" {
+  description = "The number of successful health checks before the instance is considered healthy."
+  type        = number
+  default     = 2
+  
+}
+
+variable "unhealthy_threshold" {
+  description = "The number of failed health checks before the instance is considered unhealthy."
+  type        = number
+  default     = 2
+  
+}
