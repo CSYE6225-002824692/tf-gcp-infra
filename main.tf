@@ -404,8 +404,12 @@ resource "google_compute_backend_service" "webapp_lb_backend_service" {
   port_name   = var.named_port_name
   timeout_sec = var.webapp_lb_backend_service_timeout
   health_checks = [google_compute_health_check.webapp_health_check.id]
+  load_balancing_scheme = var.webapp_lb_backend_service_load_balancing_scheme
   backend {
     group = google_compute_region_instance_group_manager.webapp_instance_group_manager.instance_group
+    balancing_mode = var.webapp_lb_backend_service_balancing_mode
+    capacity_scaler = var.webapp_lb_backend_service_capacity_scaler
+    max_utilization = var.webapp_lb_backend_service_max_utilization
   }
   depends_on = [google_compute_region_instance_group_manager.webapp_instance_group_manager]
 }
@@ -427,6 +431,8 @@ resource "google_compute_global_forwarding_rule" "webapp_lb_forwarding_rule" {
   name       = var.webapp_lb_forwarding_rule_name
   target     = google_compute_target_https_proxy.webapp_lb_https_proxy.id
   port_range = var.webapp_lb_forwarding_rule_port
+  ip_protocol = var.webapp_lb_forwarding_rule_ip_protocol
+  load_balancing_scheme = var.webapp_lb_forwarding_rule_load_balancing_scheme
 }
 
 data "google_compute_global_forwarding_rule" "webapp_lb_forwarding_rule" {

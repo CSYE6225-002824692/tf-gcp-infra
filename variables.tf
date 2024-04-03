@@ -668,3 +668,45 @@ variable "unhealthy_threshold" {
   default     = 2
   
 }
+
+variable "webapp_lb_forwarding_rule_ip_protocol" {
+  description = "The IP protocol for the forwarding rule."
+  type        = string
+  default     = "TCP"
+  
+}
+
+variable "webapp_lb_forwarding_rule_load_balancing_scheme" {
+  description = "The load balancing scheme for the forwarding rule."
+  type        = string
+  default     = "EXTERNAL_MANAGED"
+  
+}
+
+variable "webapp_lb_backend_service_load_balancing_scheme" {
+  description = "The load balancing scheme for the backend service."
+  type        = string
+  default     = "EXTERNAL_MANAGED"
+  
+}
+
+variable "webapp_lb_backend_service_balancing_mode" {
+  description = "The balancing mode for the backend service."
+  type        = string
+  default     = "UTILIZATION"
+  
+}
+
+variable "webapp_lb_backend_service_capacity_scaler" {
+  description = "The capacity scaler for the backend service."
+  type        = number
+  default     = "1.0"
+  
+}
+
+variable "webapp_lb_backend_service_max_utilization" {
+  description = "The maximum utilization for the backend service."
+  type        = number
+  default     = "0.8"
+  
+}
