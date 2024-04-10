@@ -21,7 +21,7 @@ This repository contains Terraform configurations for setting up a comprehensive
    Apply the Terraform configurations to create or update your infrastructure as defined in the .tf files.
    
    ```bash
-   terraform init
+   terraform apply
 
 3. **Destroy infrastructure**
    
