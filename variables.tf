@@ -710,3 +710,157 @@ variable "webapp_lb_backend_service_max_utilization" {
   default     = "0.8"
   
 }
+
+variable "key_ring" {
+  description = "The name of the key ring."
+  type        = string
+  default     = "webapp-key-ring"
+  
+}
+
+variable "vm_crypto_key" {
+  description = "The name of the crypto key for the VM."
+  type        = string
+  default     = "vm-crypto-key"
+  
+}
+
+variable "cloudsql_crypto_key" {
+  description = "The name of the crypto key for Cloud SQL."
+  type        = string
+  default     = "cloudsql-crypto-key"
+  
+}
+
+variable "storage_crypto_key" {
+  description = "The name of the crypto key for Cloud Storage."
+  type        = string
+  default     = "storage-crypto-key"
+  
+}
+
+variable "rotation_period" { 
+  description = "The rotation period for the crypto key."
+  type        = string
+  default     = "2592000s"
+  
+}
+
+variable "gcp_sa_cloud_sql_service_identity" {
+  description = "The service account for Cloud SQL."
+  type        = string
+  default     = "sqladmin.googleapis.com"
+  
+}
+
+variable "crypto_key_binding" {
+  description = "The role to grant to the crypto key."
+  type        = string
+  default     = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  
+}
+
+variable "verify_email_gcf_template_object_name" {
+  description = "The name of the object for the Cloud Function template."
+  type        = string
+  default     = "email_template.html"
+  
+}
+
+variable "db_user_secret_name" {
+  description = "The name of the secret for the database user."
+  type        = string
+  default     = "db-user"
+  
+}
+
+variable "db_password_secret_name" {
+  description = "The name of the secret for the database password."
+  type        = string
+  default     = "db-password"
+  
+}
+
+variable "db_name_secret_name" {
+  description = "The name of the secret for the database name."
+  type        = string
+  default     = "db-name"
+  
+}
+
+variable "db_host_secret_name" {
+  description = "The name of the secret for the database host."
+  type        = string
+  default     = "db-host"
+  
+}
+
+variable "kms_key_self_link_secret_name" {
+  description = "The self link of the secret for the KMS key."
+  type        = string
+  default     = "kms-key-self-link"
+  
+}
+
+variable "network_id_secret_name" {
+  description = "The name of the secret for the network ID."
+  type        = string
+  default     = "network-id"
+  
+}
+
+variable "subnetwork_id_secret_name" {
+  description = "The name of the secret for the subnetwork ID."
+  type        = string
+  default     = "subnetwork-id"
+  
+}
+
+variable "service_account_email_secret_name" {
+  description = "The name of the secret for the service account email."
+  type        = string
+  default     = "service-account-email"
+  
+}
+
+variable "MIG_secret_name" {
+  description = "The name of the secret for the MIG."
+  type        = string
+  default     = "mig-name"
+  
+}
+
+variable "mailgun_domain" {
+  description = "The domain for Mailgun."
+  type        = string
+  default     = "csyewebapp.me"
+  
+}
+
+variable "mailgun_domain_api_key" {
+  description = "The API key for the Mailgun domain."
+  type        = string
+  default     = "6c771365f8c72c6d4e4b647c7aade9f8-309b0ef4-9b9ce17b"
+  
+}
+
+variable "from_email" {
+  description = "The email address to send from."
+  type        = string
+  default     = "noreply@csyewebapp.me"
+  
+}
+
+variable "from_name" {
+  description = "The name to send from."
+  type        = string
+  default     = "CSYEwebapp"
+  
+}
+
+variable "verification_link" {
+  description = "The link to verify the email."
+  type        = string
+  default     = "https://csyewebapp.me/verifyEmail?token="
+  
+}
