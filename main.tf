@@ -53,6 +53,60 @@ resource "google_service_networking_connection" "private_vpc_connection" {
   reserved_peering_ranges = [google_compute_global_address.private_services_range.name]
 }
 
+resource "google_kms_key_ring" "key_ring" {
+  name     = var.key_ring
+  location = var.region
+}
+
+# CMEK for Virtual Machines
+resource "google_kms_crypto_key" "vm_crypto_key" {
+  name            = var.vm_crypto_key
+  key_ring        = google_kms_key_ring.key_ring.id
+  rotation_period = var.rotation_period
+
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
+# CMEK for CloudSQL Instances
+resource "google_kms_crypto_key" "cloudsql_crypto_key" {
+  name            = var.cloudsql_crypto_key
+  key_ring        = google_kms_key_ring.key_ring.id
+  rotation_period = var.rotation_period
+
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
+# CMEK for Cloud Storage Buckets
+resource "google_kms_crypto_key" "storage_crypto_key" {
+  name            = var.storage_crypto_key
+  key_ring        = google_kms_key_ring.key_ring.id
+  rotation_period = var.rotation_period
+
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+
+resource "google_project_service_identity" "gcp_sa_cloud_sql" {
+  project  = var.project
+  provider = google-beta
+  service  = var.gcp_sa_cloud_sql_service_identity
+}
+
+resource "google_kms_crypto_key_iam_binding" "crypto_key" {
+  provider      = google-beta
+  crypto_key_id = google_kms_crypto_key.cloudsql_crypto_key.id
+  role          = var.crypto_key_binding
+
+  members = [
+    "serviceAccount:${google_project_service_identity.gcp_sa_cloud_sql.email}",
+  ]
+}
+
 # Create a Cloud SQL database instance with specific settings including version, region, and network settings
 resource "google_sql_database_instance" "mysql" {
   name                = var.cloud_sql_instance_name
@@ -60,6 +114,7 @@ resource "google_sql_database_instance" "mysql" {
   region              = var.region
   database_version    = var.database_version
   deletion_protection = var.deletion_protection_enabled
+  encryption_key_name = google_kms_crypto_key.cloudsql_crypto_key.id
 
   settings {
     tier              = var.tier_db
@@ -82,7 +137,11 @@ resource "google_sql_database_instance" "mysql" {
   }
   
   depends_on = [
-    google_service_networking_connection.private_vpc_connection
+    google_service_networking_connection.private_vpc_connection,
+    google_project_service_identity.gcp_sa_cloud_sql,
+    google_kms_crypto_key.cloudsql_crypto_key,
+    google_kms_key_ring.key_ring
+
   ]
 }
 
@@ -167,6 +226,16 @@ resource "google_project_iam_binding" "pubsub_publisher_binding" {
   ]
 }
 
+data "google_project" "current" {
+}
+
+resource "google_kms_crypto_key_iam_binding" "crypto_vm_key_iam" {
+  crypto_key_id = google_kms_crypto_key.vm_crypto_key.id
+  role          = var.crypto_key_binding
+  members       = [
+    "serviceAccount:service-${data.google_project.current.number}@compute-system.iam.gserviceaccount.com",
+  ]
+}
 
 resource "google_compute_region_instance_template" "webapp_template" {
   name         = "${var.instance_name}-template"
@@ -176,6 +245,9 @@ resource "google_compute_region_instance_template" "webapp_template" {
     source_image = var.boot_disk_image
     auto_delete  = true
     boot         = true
+    disk_encryption_key {
+      kms_key_self_link = google_kms_crypto_key.vm_crypto_key.id
+    }
   }
   network_interface {
     network    = google_compute_network.vpc.id
@@ -198,6 +270,9 @@ resource "google_compute_region_instance_template" "webapp_template" {
   }
 
   metadata_startup_script = file(var.startup_script_path)
+
+  depends_on = [ google_kms_crypto_key_iam_binding.crypto_vm_key_iam  ]
+  
 }
 
 resource "google_compute_region_instance_group_manager" "webapp_instance_group_manager" {
@@ -342,6 +417,42 @@ resource "google_project_iam_binding" "service_account_run_invoker" {
   ]
 }
 
+resource "google_kms_crypto_key_iam_binding" "crypto_key_iam" {
+  crypto_key_id = google_kms_crypto_key.storage_crypto_key.id
+  role          = var.crypto_key_binding
+  members       = [
+    "serviceAccount:service-${data.google_project.current.number}@gs-project-accounts.iam.gserviceaccount.com",
+  ]
+}
+
+resource "random_id" "bucket_prefix" {
+  byte_length = 8
+}
+
+resource "google_storage_bucket" "gcf_bucket" {
+  name                        = "webapp-${random_id.bucket_prefix.hex}-gcf-source"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.storage_crypto_key.id
+  }
+
+  depends_on = [ google_kms_crypto_key_iam_binding.crypto_key_iam ]
+  
+}
+
+resource "google_storage_bucket_object" "verify_email_gcf_object" {
+  name   = var.storage_source_object
+  bucket = google_storage_bucket.gcf_bucket.name
+  source = "${path.root}/${var.storage_source_object}"
+}
+
+resource "google_storage_bucket_object" "verify_email_gcf_template_object" {
+  name   = var.verify_email_gcf_template_object_name
+  bucket = google_storage_bucket.gcf_bucket.name
+  source = "${path.root}/${var.verify_email_gcf_template_object_name}"
+}
+
 # Create a Cloud Function triggered by the 'verify_email' topic
 resource "google_cloudfunctions2_function" "verify_email_function" {
   name                  = var.verify_email_function_name
@@ -354,8 +465,8 @@ resource "google_cloudfunctions2_function" "verify_email_function" {
 
     source {
       storage_source {
-        bucket = var.storage_source_bucket
-        object = var.storage_source_object
+        bucket = google_storage_bucket.gcf_bucket.name
+        object = google_storage_bucket_object.verify_email_gcf_object.name
       }
     }
   }
@@ -371,6 +482,13 @@ resource "google_cloudfunctions2_function" "verify_email_function" {
       DB_USERNAME = google_sql_user.webapp_user.name
       DB_PASSWORD = google_sql_user.webapp_user.password
       INSTANCE_CONNECTION_NAME = google_sql_database_instance.mysql.connection_name
+      GCS_BUCKET_NAME = google_storage_bucket.gcf_bucket.name
+      EMAIL_TEMPLATE_FILENAME = google_storage_bucket_object.verify_email_gcf_template_object.name
+      MAILGUN_DOMAIN = var.mailgun_domain
+      MAILGUN_DOMAIN_API_KEY = var.mailgun_domain_api_key
+      FROM_EMAIL = var.from_email
+      FROM_NAME = var.from_name
+      VERIFICATION_LINK = var.verification_link
     }
 
     ingress_settings               = var.ingress_settings
@@ -458,4 +576,133 @@ resource "google_compute_firewall" "health_check_allow_firewall" {
     ports    = var.health_check_allow_firewall_ports
   }
   source_ranges = var.health_check_allow_firewall_source_ranges 
+}
+
+resource "google_secret_manager_secret" "db_user_secret" {
+  secret_id = var.db_user_secret_name
+  labels = {
+    label = var.db_user_secret_name
+  }
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "db_user_secret_version" {
+  secret      = google_secret_manager_secret.db_user_secret.id
+  secret_data = base64encode(google_sql_user.webapp_user.name)
+}
+
+resource "google_secret_manager_secret" "db_password_secret" {
+  secret_id = var.db_password_secret_name
+  labels = {
+    label = var.db_password_secret_name
+  }
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "db_password_secret_version" {
+  secret      = google_secret_manager_secret.db_password_secret.id
+  secret_data = base64encode(google_sql_user.webapp_user.password)
+}
+
+
+resource "google_secret_manager_secret" "db_name_secret" {
+  secret_id = var.db_name_secret_name
+  labels = {
+    label = var.db_name_secret_name
+  }
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "db_name_secret_version" {
+  secret      = google_secret_manager_secret.db_name_secret.id
+  secret_data = base64encode(google_sql_database.webapp_database.name)
+}
+
+
+resource "google_secret_manager_secret" "db_host_secret" {
+  secret_id = var.db_host_secret_name
+  labels = {
+    label = var.db_host_secret_name
+  }
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "db_host_secret_version" {
+  secret      = google_secret_manager_secret.db_host_secret.id
+  secret_data = base64encode(google_sql_database_instance.mysql.private_ip_address)
+}
+
+resource "google_secret_manager_secret" "kms_key_self_link_secret" {
+  secret_id = var.kms_key_self_link_secret_name
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "kms_key_self_link_secret_version" {
+  secret      = google_secret_manager_secret.kms_key_self_link_secret.id
+  secret_data = base64encode(google_kms_crypto_key.vm_crypto_key.id)
+}
+
+
+resource "google_secret_manager_secret" "network_id_secret" {
+  secret_id = var.network_id_secret_name
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "network_id_secret_version" {
+  secret      = google_secret_manager_secret.network_id_secret.id
+  secret_data = base64encode(google_compute_network.vpc.id)
+}
+
+
+resource "google_secret_manager_secret" "subnetwork_id_secret" {
+  secret_id = var.subnetwork_id_secret_name
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "subnetwork_id_secret_version" {
+  secret      = google_secret_manager_secret.subnetwork_id_secret.id
+  secret_data = base64encode(google_compute_subnetwork.webapp_subnet.id)
+}
+
+resource "google_secret_manager_secret" "service_account_email_secret" {
+  secret_id = var.service_account_email_secret_name
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "service_account_email_secret_version" {
+  secret      = google_secret_manager_secret.service_account_email_secret.id
+  secret_data = base64encode(google_service_account.vm_service_account.email)
+}
+
+
+resource "google_secret_manager_secret" "MIG_secret" {
+  secret_id = var.MIG_secret_name
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "MIG_secret_version" {
+  secret      = google_secret_manager_secret.MIG_secret.id
+  secret_data = base64encode(google_compute_region_instance_group_manager.webapp_instance_group_manager.name)
 }
